@@ -14,6 +14,9 @@ session = lopolis.Session(USERNAME, PASSWORD)
 
 history: dict = {}
 
+UNSET_MEAL = -1
+MEAL_NOT_FOUND = -2
+
 def get_meal_id(options: list[tuple[str, int]]) -> tuple[int, str]:
     meals = json.load(open(DATA_FP))
 
@@ -23,13 +26,13 @@ def get_meal_id(options: list[tuple[str, int]]) -> tuple[int, str]:
             return options[int(meal_n) - 1][1], options[int(meal_n) - 1][0].title() # Choose the given id (-1 because it"s not 0 indexed)
 
         if meal == "ODJAVI":
-            return -1, "Odjava" # -1 -> unset
+            return UNSET_MEAL, "Odjava"
 
         for name, id in options:
             if name.lower() == meal.lower():
                 return id, name.title()
 
-    return -2, "" # -2 -> not found
+    return MEAL_NOT_FOUND, ""
 
 def set_meals():
     next_moday = datetime.today() + timedelta((0 - datetime.today().weekday()) % 7)
@@ -40,11 +43,11 @@ def set_meals():
         opts = [(i["description"].strip(), int(i["id"])) for i in snack]
         id, desc = get_meal_id(opts)
 
-        if id == -2:
+        if id == MEAL_NOT_FOUND:
             print(f"Failed to set meal: {id}, for date: {date.strftime("%d/%m/%Y")}")
             continue
 
-        if id == -1:
+        if id == UNSET_MEAL:
             r = session.api.unset_meals_menu(date)
         else:
             r = session.api.set_meals_menu(date, id)
@@ -88,24 +91,27 @@ def gather_meals(n: int) -> list:
 
     return gathered
 
+def write_meals(meals: dict):
+    with open(DATA_FP, "w") as f:
+        f.write(json.dumps(meals))
+
 def save_gathered(n: int):
-    gathered = gather_meals(n)
-    existing = []
+    gathered: list[str] = gather_meals(n)
+    meals = {"meals": [], "unordered": []}
 
     if os.path.exists(DATA_FP):
-        existing = json.load(open(DATA_FP))
+        meals: dict[str, list[str]] = json.load(open(DATA_FP))
 
-    filtered = []
+    for each in meals["meals"]:
+        if not each in gathered:
+            meals["meals"].remove(each)
 
-    for each in existing:
-        if each in gathered:
-            filtered.append(each)
+        else:
             gathered.remove(each)
 
-    missing = gathered # Now all of the existing ones have been removed
+    meals["unordered"] = gathered
 
-    with open(DATA_FP, "w") as f:
-        f.write(json.dumps({"meals": filtered, "unordered": missing}))
+    write_meals(meals)
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -152,7 +158,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return super().do_GET()
 
         except Exception as e:
-            print(f"Failed to serve {self.path}: {e}")
+            print(f"[do_GET] Failed to serve {self.path}: {e}")
+            self.path = "/500.html"
+            return super().do_GET()
+
+    def do_POST(self):
+        try:
+            if self.path == "/api/meals":
+                try:
+                    data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                    if data["meals"] and data["unordered"]:
+                        write_meals(data)
+                    return self._send_json(200, b"{\"ok\": true}")
+                except:
+                    return self._send_json(500, b"{\"ok\": false}")
+
+        except Exception as e:
+            print(f"[do_POST] Failed to serve {self.path}: {e}")
             self.path = "/500.html"
             return super().do_GET()
 
