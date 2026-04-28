@@ -135,6 +135,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.path = "/index.html"
                 return super().do_GET()
 
+            elif self.path == "/api/credentials":
+                if creds_exist:
+                    return self.send_json(200, b"true")
+
+                return self.send_json(200, b"false")
+
+            elif self.path.startswith("/assets/"):
+                return super().do_GET()
+
+            elif not creds_exist:
+                self.send_response(301)
+                self.send_header("Location", "/")
+                self.end_headers()
+
             elif self.path == "/api/meals":
                 data = b"[]"
                 if os.path.exists(DATA_FP):
@@ -151,20 +165,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             elif self.path == "/api/history":
                 self.send_json(200, json.dumps(history).encode())
-
-            elif self.path == "/api/credentials":
-                if creds_exist:
-                    return self.send_json(200, b"true")
-
-                return self.send_json(200, b"false")
-
-            elif self.path.startswith("/assets/"):
-                return super().do_GET()
-
-            elif not creds_exist:
-                self.send_response(301)
-                self.send_header("Location", "/")
-                self.end_headers()
 
             elif self.path == "/api/set" or self.path == "/api/gather":
                 if self.path == "/api/set":
@@ -189,22 +189,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return super().do_GET()
 
     def do_POST(self):
-        if not creds_exist:
-            return self.send_json(400, b"{\"status\": 400, \"message\": \"Credentials not set\"}")
-
         try:
-            if self.path == "/api/meals":
-                try:
-                    data = strip_dict(self.get_form(), "meals", "unordered")
-
-                    if data:
-                        write_meals(data)
-
-                    return self.send_json(200, b"{\"ok\": true}")
-                except:
-                    return self.send_json(500, b"{\"ok\": false}")
-
-            elif self.path == "/api/credentials":
+            if self.path == "/api/credentials":
                 try:
                     data = strip_dict(self.get_form(), "username", "password")
 
@@ -212,7 +198,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         with open(CREDS_FP, "w") as f:
                             f.write(json.dumps(data))
 
-                    return self.send_json(500, b"{\"ok\": true}")
+                    return self.send_json(200, b"{\"ok\": true}")
+                except:
+                    return self.send_json(500, b"{\"ok\": false}")
+
+            elif not creds_exist:
+                return self.send_json(400, b"{\"status\": 400, \"message\": \"Credentials not set\"}")
+
+            elif self.path == "/api/meals":
+                try:
+                    data = strip_dict(self.get_form(), "meals", "unordered")
+
+                    if data:
+                        write_meals(data)
+
+                    return self.send_json(200, b"{\"ok\": true}")
                 except:
                     return self.send_json(500, b"{\"ok\": false}")
 
