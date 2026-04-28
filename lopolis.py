@@ -27,7 +27,7 @@ import http.cookiejar
 class LoginError(Exception):...
 
 class API:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session) -> None:
         self.session = session
         self._next_action_script_pos = {"timetable": 13, "meals": 15, "unset_meals": 15, "evaluations": 13}
         self._next_action_in_file_pos = {"timetable": 0, "meals": 2, "unset_meals": 0, "evaluations": 0}
