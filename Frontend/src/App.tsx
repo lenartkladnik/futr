@@ -218,6 +218,7 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCredentialsOpen, setIsCredentialsOpen] = useState(false)
+  const [credentialsWareSet, setCredentialsWareSet] = useState(localStorage.getItem("credentialsWareSet") === "1")
   const toolbarRef = useRef<HTMLDivElement | null>(null)
   const activeItem = useMemo(() => findItem(activeId, lists), [activeId, lists])
   const historyNotificationCount = useMemo(() => Object.keys(historyItems).length, [historyItems])
@@ -230,15 +231,26 @@ export default function App() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
+  function handleCredentialsSaved() {
+    localStorage.setItem("credentialsWareSet", "1")
+    setCredentialsWareSet(true)
+  }
+
   useEffect(() => {
     let isMounted = true
     async function loadBoardData() {
-      const [mealsData, unorderedMeals, historyData] = await Promise.all([
+      const [mealsData, unorderedMeals, historyData, credentialsWareSetServer] = await Promise.all([
         getFetchData<string[]>('/api/meals'),
         getFetchData<string[]>('/api/unordered'),
-        getFetchData<HistoryMap>('/api/history')
+        getFetchData<HistoryMap>('/api/history'),
+        credentialsWareSet ? Promise.resolve(true) : getFetchData<unknown>('/api/credentials')
       ])
       if (!isMounted) return
+      if (typeof credentialsWareSetServer === 'boolean') {
+        setCredentialsWareSet(credentialsWareSetServer)
+        if (credentialsWareSetServer) localStorage.setItem("credentialsWareSet", "1")
+        else setIsCredentialsOpen(true)
+      }
       setLists(currentLists => {
         let nextLists = currentLists
         let hasUpdate = false
@@ -430,6 +442,10 @@ export default function App() {
         {activeItem && <MealItem as="div" item={activeItem} className="drag-overlay-item" />}
       </DragOverlay>
     </DndContext>
-    {isCredentialsOpen && <Credentials onClose={() => setIsCredentialsOpen(false)} />}
+    {isCredentialsOpen && <Credentials
+      firstTime={!credentialsWareSet}
+      onClose={() => setIsCredentialsOpen(false)}
+      onSaved={handleCredentialsSaved}
+    />}
   </main>
 }

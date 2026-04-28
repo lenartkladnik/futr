@@ -7,7 +7,7 @@ type Credentials = {
   password: string
 }
 
-export default function Credentials({ onClose }: { onClose: () => void }) {
+export default function Credentials({ onClose, onSaved, firstTime }: { onClose: () => void, onSaved: () => void, firstTime: boolean }) {
   const [credentials, setCredentials] = useState<Credentials>({ username: '', password: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -21,6 +21,7 @@ export default function Credentials({ onClose }: { onClose: () => void }) {
     setIsSubmitting(false)
     if (!response) return
     addAlert(response.message ?? 'Credentials saved.', 'G')
+    onSaved()
     onClose()
   }
 
@@ -32,13 +33,13 @@ export default function Credentials({ onClose }: { onClose: () => void }) {
     <form className="modal-card" onSubmit={handleSubmit}>
       <div className="modal-header">
         <h2>Credentials</h2>
-        <button
+        {!firstTime && <button
           className="modal-close"
           onClick={onClose}
           type="button"
         >
           Close
-        </button>
+        </button>}
       </div>
       <label className="modal-field">
         <span>Username</span>

@@ -78,6 +78,14 @@ const server = createServer(async (request, response) => {
     return
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/credentials') {
+    sendJson(response, 200, Boolean(
+      store.credentials.username.trim() &&
+      store.credentials.password.trim()
+    ))
+    return
+  }
+
   if (request.method === 'POST' && url.pathname === '/api/meals') {
     try {
       const body = await readJsonBody(request)
