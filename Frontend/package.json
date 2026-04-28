@@ -6,7 +6,7 @@
   "scripts": {
     "mock-api": "node mock-server.mjs",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && mv dist ../dist",
+    "build": "tsc --noEmit && vite build --outDir ../",
     "preview": "vite preview"
   },
   "dependencies": {
