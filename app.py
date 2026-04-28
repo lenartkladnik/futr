@@ -5,10 +5,20 @@ import lopolis
 import json
 import os.path
 from datetime import datetime, timedelta
+import argparse
 
-PORT = 5847
-DATA_FP = "meals.json"
-CREDS_FP = "creds.json"
+parser = argparse.ArgumentParser("futr")
+parser.add_argument("--port", default=5847, type=int)
+parser.add_argument("--docker", action="store_true")
+args = parser.parse_args()
+
+PORT = args.port
+if args.docker:
+    DATA_FP = "/data/meals.json"
+    CREDS_FP = "/data/creds.json"
+else:
+    DATA_FP = "data/meals.json"
+    CREDS_FP = "data/creds.json"
 SERVE_PREFIX = "/serve"
 creds_exist = False
 try:
@@ -201,7 +211,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     return self.serve_json(500, b"{\"ok\": false}")
 
             elif not creds_exist:
-                return self.serve_json(400, b"{\"status\": 400, \"message\": \"Credentials not set\"}")
+                return self.serve_json(403, b"{\"status\": 403, \"message\": \"Credentials not set\"}")
 
             elif self.path == "/api/meals":
                 try:

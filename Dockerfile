@@ -26,4 +26,4 @@ COPY app.py lopolis.py ./
 VOLUME ["/data"]
 EXPOSE 5847
 
-CMD ["python", "app.py", "--docker"]
+CMD ["python", "app.py", "--docker", "--port", "5847"]
