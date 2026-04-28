@@ -5,5 +5,4 @@ dist
 node_modules
 .codex
 package-lock.json
-/*.html
-/assets
+/serve
