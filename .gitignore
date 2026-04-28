@@ -3,6 +3,7 @@ meals.json
 __pycache__/
 dist
 node_modules
-public
 .codex
 package-lock.json
+/index.html
+/assets
