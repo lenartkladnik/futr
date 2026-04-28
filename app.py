@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 PORT = 5847
 DATA_FP = "meals.json"
 CREDS_FP = "creds.json"
+SERVE_PREFIX = "/serve"
 creds_exist = False
 try:
     creds = json.load(open(CREDS_FP))
@@ -132,17 +133,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         try:
             if self.path == "/":
-                self.path = "/index.html"
-                return super().do_GET()
+                self.serve_file("index.html")
 
             elif self.path == "/api/credentials":
                 if creds_exist:
-                    return self.send_json(200, b"true")
+                    return self.serve_json(200, b"true")
 
-                return self.send_json(200, b"false")
+                return self.serve_json(200, b"false")
 
             elif self.path.startswith("/assets/"):
-                return super().do_GET()
+                self.serve_file(self.path)
 
             elif not creds_exist:
                 self.send_response(301)
@@ -154,17 +154,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 if os.path.exists(DATA_FP):
                     data = json.dumps(json.load(open(DATA_FP))["meals"]).encode()
 
-                self.send_json(200, data)
+                self.serve_json(200, data)
 
             elif self.path == "/api/unordered":
                 data = b"[]"
                 if os.path.exists(DATA_FP):
                     data = json.dumps(json.load(open(DATA_FP))["unordered"]).encode()
 
-                self.send_json(200, data)
+                self.serve_json(200, data)
 
             elif self.path == "/api/history":
-                self.send_json(200, json.dumps(history).encode())
+                self.serve_json(200, json.dumps(history).encode())
 
             elif self.path == "/api/set" or self.path == "/api/gather":
                 if self.path == "/api/set":
@@ -180,13 +180,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
 
             else:
-                self.path = "/404.html"
-                return super().do_GET()
+                self.serve_file("404.html")
 
         except Exception as e:
             print(f"[do_GET] Failed to serve {self.path}: {e}")
-            self.path = "/500.html"
-            return super().do_GET()
+            self.serve_file("500.html")
 
     def do_POST(self):
         try:
@@ -198,12 +196,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         with open(CREDS_FP, "w") as f:
                             f.write(json.dumps(data))
 
-                    return self.send_json(200, b"{\"ok\": true}")
+                    return self.serve_json(200, b"{\"ok\": true}")
                 except:
-                    return self.send_json(500, b"{\"ok\": false}")
+                    return self.serve_json(500, b"{\"ok\": false}")
 
             elif not creds_exist:
-                return self.send_json(400, b"{\"status\": 400, \"message\": \"Credentials not set\"}")
+                return self.serve_json(400, b"{\"status\": 400, \"message\": \"Credentials not set\"}")
 
             elif self.path == "/api/meals":
                 try:
@@ -212,15 +210,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     if data:
                         write_meals(data)
 
-                    return self.send_json(200, b"{\"ok\": true}")
+                    return self.serve_json(200, b"{\"ok\": true}")
                 except:
-                    return self.send_json(500, b"{\"ok\": false}")
+                    return self.serve_json(500, b"{\"ok\": false}")
 
         except Exception as e:
             print(f"[do_POST] Failed to serve {self.path}: {e}")
-            return self.send_json(500, b"{\"status\": 500, \"message\": \"Internal server error\"}")
+            return self.serve_json(500, b"{\"status\": 500, \"message\": \"Internal server error\"}")
 
-    def send_json(self, status, data: bytes):
+    def serve_json(self, status, data: bytes):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
@@ -229,6 +227,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def get_form(self):
         return json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+
+    def serve_file(self, relative_path: str):
+        if relative_path.startswith("/"):
+            relative_path = relative_path[1:]
+        self.path = os.path.join(SERVE_PREFIX, relative_path)
+        return super().do_GET()
 
 socketserver.TCPServer.allow_reuse_address = True
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
