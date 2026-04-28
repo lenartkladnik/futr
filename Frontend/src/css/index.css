@@ -1,0 +1,33 @@
+:root {
+  --bg: #111214;
+  --surface: #1a1c1f;
+  --surface-strong: #23262b;
+  --text: #f3f4f6;
+  --muted: #a1a5ad;
+  --accent: #c9e36c;
+  --line: #32363d;
+  --danger: #d86e6e;
+  --shadow: rgba(0, 0, 0, 0.28);
+  --focus: var(--accent);
+  --font-body: 'Manrope', 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  color-scheme: dark;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+  font-family: var(--font-body);
+}
+
+:is(*, *::before, *::after) {
+  box-sizing: border-box;
+}
