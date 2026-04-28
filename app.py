@@ -1,5 +1,6 @@
 import http.server
 import socketserver
+from typing import Any
 import lopolis
 import json
 import os.path
@@ -7,10 +8,16 @@ from datetime import datetime, timedelta
 
 PORT = 5847
 DATA_FP = "meals.json"
-creds = json.load(open("creds.json"))
-USERNAME = creds["username"]
-PASSWORD = creds["password"]
-session = lopolis.Session(USERNAME, PASSWORD)
+CREDS_FP = "creds.json"
+creds_exist = False
+try:
+    creds = json.load(open(CREDS_FP))
+    USERNAME = creds["username"]
+    PASSWORD = creds["password"]
+    session = lopolis.Session(USERNAME, PASSWORD)
+    creds_exist = True
+except FileNotFoundError:
+    pass
 
 history: dict = {}
 
@@ -113,6 +120,14 @@ def save_gathered(n: int):
 
     write_meals(meals)
 
+def strip_dict(obj: dict[str, Any], *fields: str) -> dict:
+    new_obj = {}
+    for field in fields:
+        if field in obj.keys():
+            new_obj.update({field: obj[field]})
+
+    return new_obj
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         try:
@@ -120,7 +135,38 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.path = "/index.html"
                 return super().do_GET()
 
-            if self.path == "/api/set" or self.path == "/api/gather":
+            elif self.path == "/api/meals":
+                data = b"[]"
+                if os.path.exists(DATA_FP):
+                    data = json.dumps(json.load(open(DATA_FP))["meals"]).encode()
+
+                self.send_json(200, data)
+
+            elif self.path == "/api/unordered":
+                data = b"[]"
+                if os.path.exists(DATA_FP):
+                    data = json.dumps(json.load(open(DATA_FP))["unordered"]).encode()
+
+                self.send_json(200, data)
+
+            elif self.path == "/api/history":
+                self.send_json(200, json.dumps(history).encode())
+
+            elif self.path == "/api/credentials":
+                if creds_exist:
+                    return self.send_json(200, b"true")
+
+                return self.send_json(200, b"false")
+
+            elif self.path.startswith("/assets/"):
+                return super().do_GET()
+
+            elif not creds_exist:
+                self.send_response(301)
+                self.send_header("Location", "/")
+                self.end_headers()
+
+            elif self.path == "/api/set" or self.path == "/api/gather":
                 if self.path == "/api/set":
                     session.refresh()
                     set_meals()
@@ -133,26 +179,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Location", "/")
                 self.end_headers()
 
-            elif self.path == "/api/meals":
-                data = b"[]"
-                if os.path.exists(DATA_FP):
-                    data = json.dumps(json.load(open(DATA_FP))["meals"]).encode()
-
-                self._send_json(200, data)
-
-            elif self.path == "/api/unordered":
-                data = b"[]"
-                if os.path.exists(DATA_FP):
-                    data = json.dumps(json.load(open(DATA_FP))["unordered"]).encode()
-
-                self._send_json(200, data)
-
-            elif self.path == "/api/history":
-                self._send_json(200, json.dumps(history).encode())
-
-            elif self.path.startswith("/assets/"):
-                return super().do_GET()
-
             else:
                 self.path = "/404.html"
                 return super().do_GET()
@@ -163,27 +189,46 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return super().do_GET()
 
     def do_POST(self):
+        if not creds_exist:
+            return self.send_json(400, b"{\"status\": 400, \"message\": \"Credentials not set\"}")
+
         try:
             if self.path == "/api/meals":
                 try:
-                    data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
-                    if data["meals"] and data["unordered"]:
+                    data = strip_dict(self.get_form(), "meals", "unordered")
+
+                    if data:
                         write_meals(data)
-                    return self._send_json(200, b"{\"ok\": true}")
+
+                    return self.send_json(200, b"{\"ok\": true}")
                 except:
-                    return self._send_json(500, b"{\"ok\": false}")
+                    return self.send_json(500, b"{\"ok\": false}")
+
+            elif self.path == "/api/credentials":
+                try:
+                    data = strip_dict(self.get_form(), "username", "password")
+
+                    if data:
+                        with open(CREDS_FP, "w") as f:
+                            f.write(json.dumps(data))
+
+                    return self.send_json(500, b"{\"ok\": true}")
+                except:
+                    return self.send_json(500, b"{\"ok\": false}")
 
         except Exception as e:
             print(f"[do_POST] Failed to serve {self.path}: {e}")
-            self.path = "/500.html"
-            return super().do_GET()
+            return self.send_json(500, b"{\"status\": 500, \"message\": \"Internal server error\"}")
 
-    def _send_json(self, status, data: bytes):
+    def send_json(self, status, data: bytes):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def get_form(self):
+        return json.loads(self.rfile.read(int(self.headers['Content-Length'])))
 
 socketserver.TCPServer.allow_reuse_address = True
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
