@@ -1,0 +1,13 @@
+.git
+.codex
+__pycache__/
+
+creds.json
+meals.json
+data/
+
+serve/
+dist/
+node_modules/
+Frontend/dist/
+Frontend/node_modules/
