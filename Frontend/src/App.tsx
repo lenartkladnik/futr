@@ -51,10 +51,6 @@ const listDetails: Record<ListId, ListDetail> = {
 const listEntries = listIds.map(listId => [listId, listDetails[listId]] as const)
 const isListId = (value: UniqueIdentifier | null | undefined): value is ListId => value === 'meals' || value === 'unordered'
 const getId = (value: UniqueIdentifier) => String(value)
-const isHistoryMap = (value: unknown): value is HistoryMap => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
-  return Object.values(value).every(item => typeof item === 'string')
-}
 
 function createListItems(listId: ListId, labels: string[]) {
   return labels.map((label, index) => ({
@@ -218,6 +214,7 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCredentialsOpen, setIsCredentialsOpen] = useState(false)
+  const [isGathering, setIsGathering] = useState(false)
   const [credentialsWareSet, setCredentialsWareSet] = useState(localStorage.getItem("credentialsWareSet") === "1")
   const toolbarRef = useRef<HTMLDivElement | null>(null)
   const activeItem = useMemo(() => findItem(activeId, lists), [activeId, lists])
@@ -231,6 +228,21 @@ export default function App() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
+  async function loadMealLists(shouldApply = () => true) {
+    const [mealsData, unorderedMeals] = await Promise.all([
+      getFetchData<string[]>('/api/meals'),
+      getFetchData<string[]>('/api/unordered'),
+    ])
+    if (!shouldApply() || mealsData === null || unorderedMeals === null) return
+
+    setLists(currentLists => ({
+      ...currentLists,
+      meals: createListItems('meals', mealsData),
+      unordered: createListItems('unordered', unorderedMeals),
+    }))
+    setIsUnorderedVisible(unorderedMeals.length > 0)
+  }
+
   function handleCredentialsSaved() {
     localStorage.setItem("credentialsWareSet", "1")
     setCredentialsWareSet(true)
@@ -239,37 +251,19 @@ export default function App() {
   useEffect(() => {
     let isMounted = true
     async function loadBoardData() {
-      const [mealsData, unorderedMeals, historyData, credentialsWareSetServer] = await Promise.all([
-        getFetchData<string[]>('/api/meals'),
-        getFetchData<string[]>('/api/unordered'),
+      const [historyData, credentialsWareSetServer] = await Promise.all([
         getFetchData<HistoryMap>('/api/history'),
-        credentialsWareSet ? Promise.resolve(true) : getFetchData<unknown>('/api/credentials')
+        credentialsWareSet ? Promise.resolve(true) : getFetchData<boolean>('/api/credentials')
       ])
       if (!isMounted) return
-      if (typeof credentialsWareSetServer === 'boolean') {
+      await loadMealLists(() => isMounted)
+      if (!isMounted) return
+      if (credentialsWareSetServer !== null) {
         setCredentialsWareSet(credentialsWareSetServer)
         if (credentialsWareSetServer) localStorage.setItem("credentialsWareSet", "1")
         else setIsCredentialsOpen(true)
       }
-      setLists(currentLists => {
-        let nextLists = currentLists
-        let hasUpdate = false
-        if (mealsData) {
-          nextLists = { ...nextLists, meals: createListItems('meals', mealsData) }
-          hasUpdate = true
-        }
-        else if (mealsData !== null) addAlert('Meals response is invalid.', 'E')
-
-        if (unorderedMeals) {
-          nextLists = { ...nextLists, unordered: createListItems('unordered', unorderedMeals) }
-          hasUpdate = true
-          setIsUnorderedVisible(unorderedMeals.length > 0)
-        }
-        else if (unorderedMeals !== null) addAlert('Unordered meals response is invalid.', 'E')
-        return hasUpdate ? nextLists : currentLists
-      })
-      if (isHistoryMap(historyData)) setHistoryItems(historyData)
-      else if (historyData !== null) addAlert('History response is invalid.', 'E')
+      if (historyData !== null) setHistoryItems(historyData)
     }
 
     void loadBoardData()
@@ -348,9 +342,14 @@ export default function App() {
     })
   }
 
-  function handleGather() {
-    getFetchData("/api/gather")
-    console.log("GATHER")
+  async function handleGather() {
+    if (isGathering) return
+    setIsGathering(true)
+    try { if (await getFetchData('/api/gather') !== null) await loadMealLists() }
+    finally {
+      addAlert("Meals gathered", "G")
+      setIsGathering(false)
+    }
   }
   function handleOrder() {
     getFetchData("/api/order")
@@ -409,7 +408,9 @@ export default function App() {
           User actions
         </button>
         {isMenuOpen && <div className="menu-popup menu-popup-right" role="dialog" aria-label="Actions menu">
-          <button type="button" onClick={handleGather}>Gather</button>
+          <button disabled={isGathering} type="button" onClick={handleGather}>
+            {isGathering ? 'Gathering' : 'Gather'}
+          </button>
           <button type="button" onClick={handleOrder}>Order</button>
         </div>}
       </div>

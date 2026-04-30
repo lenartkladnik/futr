@@ -85,7 +85,7 @@ def gather_meals(n: int) -> list:
         date = datetime.today() - timedelta(i)
 
         try:
-            snack = session.api.get_meals_menu(date)["items"][0]["menus"]["afternoon_snack"]
+            snack = session.api.get_meals_menu(date)["items"][0]["menus"]["snack"]
             names = [i["description"].strip() for i in snack]
 
             for i in names:
@@ -102,8 +102,9 @@ def gather_meals(n: int) -> list:
     except:
         pass
 
-    for i in range(1, 5):
-        gathered.append(f"KATERA KOLI {i}.")
+    if len(gathered) == 0:
+        for i in range(1, 5):
+            gathered.append(f"KATERA KOLI {i}.")
 
     gathered.append("ODJAVI")
 
@@ -190,9 +191,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
 
             else:
+                self.send_response(404)
                 self.serve_file("404.html")
 
         except Exception as e:
+            self.send_response(500)
             print(f"[do_GET] Failed to serve {self.path}: {e}")
             self.serve_file("500.html")
 
