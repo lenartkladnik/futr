@@ -34,9 +34,23 @@ history: dict = {}
 
 UNSET_MEAL = -1
 MEAL_NOT_FOUND = -2
+EMPTY_MEALS_FILE = {"meals": [], "unordered": []}
+
+def ensure_meals_file():
+    if os.path.exists(DATA_FP) and os.path.getsize(DATA_FP) >= len(json.dumps(EMPTY_MEALS_FILE)) :
+        return
+    
+    print("Making empty meals.json")
+    
+    data_dir = os.path.dirname(DATA_FP)
+    if data_dir:
+        os.makedirs(data_dir, exist_ok=True)
+
+    write_meals(EMPTY_MEALS_FILE)
 
 def get_meal_id(options: list[tuple[str, int]]) -> tuple[int, str]:
-    meals = json.load(open(DATA_FP))
+    ensure_meals_file()
+    meals = json.load(open(DATA_FP))["meals"]
 
     for meal in meals:
         if meal.startswith("KATERA KOLI "):
@@ -57,7 +71,7 @@ def set_meals():
     for i in range(5):
         date = next_moday + timedelta(i)
 
-        snack = session.api.get_meals_menu(date)["items"][0]["menus"]["afternoon_snack"]
+        snack = session.api.get_meals_menu(date)["items"][0]["menus"]["snack"]
         opts = [(i["description"].strip(), int(i["id"])) for i in snack]
         id, desc = get_meal_id(opts)
 
@@ -102,9 +116,8 @@ def gather_meals(n: int) -> list:
     except:
         pass
 
-    if len(gathered) == 0:
-        for i in range(1, 5):
-            gathered.append(f"KATERA KOLI {i}.")
+    for i in range(1, 5):
+        gathered.append(f"KATERA KOLI {i}.")
 
     gathered.append("ODJAVI")
 
@@ -119,6 +132,7 @@ def save_gathered(n: int):
     meals = {"meals": [], "unordered": []}
 
     if os.path.exists(DATA_FP):
+        ensure_meals_file()
         meals: dict[str, list[str]] = json.load(open(DATA_FP))
 
     for each in meals["meals"]:
@@ -163,6 +177,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             elif self.path == "/api/meals":
                 data = b"[]"
                 if os.path.exists(DATA_FP):
+                    ensure_meals_file()
                     data = json.dumps(json.load(open(DATA_FP))["meals"]).encode()
 
                 self.serve_json(200, data)
@@ -170,6 +185,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             elif self.path == "/api/unordered":
                 data = b"[]"
                 if os.path.exists(DATA_FP):
+                    ensure_meals_file()
                     data = json.dumps(json.load(open(DATA_FP))["unordered"]).encode()
 
                 self.serve_json(200, data)
