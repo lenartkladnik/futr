@@ -1,4 +1,4 @@
-FROM node:22-alpine AS frontendBuilder
+FROM node:22-alpine AS frontendbuilder
 
 WORKDIR /src/Frontend
 
@@ -20,7 +20,7 @@ RUN mkdir -p /data
 
 WORKDIR /app
 
-COPY --from=frontendBuilder /src/serve/ ./serve/
+COPY --from=frontendbuilder /src/serve/ ./serve/
 COPY app.py lopolis.py ./
 
 VOLUME ["/data"]
