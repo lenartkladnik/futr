@@ -8,7 +8,7 @@ fi
 
 VERSION="$1"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE="${DOCKER_IMAGE:-ghcr.io/lenartkladnik/futr}"
+IMAGE="${DOCKER_IMAGE:-ghcr.io/puhi8/futr-dockerBuild}"
 PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 TOKEN="${GHCR_TOKEN:-${CR_PAT:-${GITHUB_TOKEN:-}}}"
 

@@ -7,7 +7,7 @@ Futr is a web app for managing / ordering Lopolis meals.
 ```yaml
 services:
   futr:
-    image: ghcr.io/lenartkladnik/futr:latest
+    image: ghcr.io/puhi8/futr:latest
     restart: unless-stopped
     ports:
       - "5847:5847"
@@ -53,15 +53,3 @@ http://localhost:5847
 
 The app stores local data in `creds.json` and `meals.json` by default. Set `DATA_DIR` to store them somewhere else.
 
-## Docker
-
-The Docker image stores runtime data in `/data`, so mount a volume there to keep credentials and meal preferences across updates.
-
-Build and run the container:
-
-```sh
-docker build -t futr .
-docker run --rm -p 5847:5847 -v futr-data:/data futr
-```
-
-Then open `http://localhost:5847`.
