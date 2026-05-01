@@ -83,8 +83,10 @@ export default function ListColumn({ activeId, activeItem, details, dropIndicato
   const odjavaIndex = listId === 'meals' ? items.findIndex(isOdjavaItem) : -1
   const searchResults = searchItems(items, searchQuery)
   const visibleItems = activeId ? searchResults.filter(({ item }) => item.id !== String(activeId)) : searchResults
+  const activeIndex = activeId ? items.findIndex(item => item.id === String(activeId)) : -1
+  const getVisibleOrderIndex = (index: number) => activeIndex !== -1 && index > activeIndex ? index - 1 : index
   const ghostIndex = dropIndicator?.listId === listId && activeItem
-    ? visibleItems.findIndex(({ index }) => index >= dropIndicator.index)
+    ? visibleItems.findIndex(({ index }) => getVisibleOrderIndex(index) >= dropIndicator.index)
     : null
   const resolvedGhostIndex = ghostIndex === -1 ? visibleItems.length : ghostIndex
   const emptyMessage = searchQuery.trim() ? 'No matches.' : details.empty
