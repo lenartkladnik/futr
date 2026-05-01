@@ -23,6 +23,21 @@
   margin-left: auto;
 }
 
+.search-input {
+  width: min(260px, 34vw);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
+.search-input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
 :is(.save-button, .menu-button, .menu-popup button) {
   min-width: 128px;
   border: 1px solid var(--accent);
@@ -250,6 +265,7 @@
 .item {
   display: flex;
   align-items: center;
+  gap: 10px;
   min-height: 54px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -261,13 +277,43 @@
   transition: opacity 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
 
+.item-position-button {
+  flex: 0 0 38px;
+  width: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+
+.item-position-button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.item-odjava,
+.item-odjava .item-position-button {
+  border-color: color-mix(in srgb, var(--danger) 64%, var(--line));
+  color: var(--danger);
+}
+
+.item-after-odjava {
+  opacity: 0.52;
+}
+
 .item-ghost {
   border-style: dashed;
   border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
   background: color-mix(in srgb, var(--accent) 10%, var(--surface-strong));
   color: color-mix(in srgb, var(--accent) 64%, var(--text));
   opacity: 0.72;
- }
+}
 
 .item:active {
   cursor: grabbing;

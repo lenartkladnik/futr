@@ -1,34 +1,16 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  closestCorners, DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors,
+  closestCorners, DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors,
   type DragEndEvent, type DragOverEvent, type DragStartEvent, type UniqueIdentifier
 } from '@dnd-kit/core'
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { addAlert } from './components/alertSystem'
 import Credentials from './components/Credentials'
 import { generalFetch, getFetchData } from './components/fetch'
+import ListColumn from './components/ListColumn'
+import Toolbar from './components/Toolbar'
+import type { DropIndicator, HistoryMap, ListDetail, ListId, ListItem, ListState } from './types'
 import './css/app.css'
-
-type ListId = 'meals' | 'unordered'
-
-type ListItem = {
-  id: string
-  label: string
-}
-
-type ListState = Record<ListId, ListItem[]>
-
-type ListDetail = {
-  title: string
-  empty: string
-}
-
-type HistoryMap = Record<string, string>
-type DropIndicator = {
-  listId: ListId
-  index: number
-}
 
 const listIds: ListId[] = ['meals', 'unordered']
 
@@ -59,12 +41,40 @@ function createListItems(listId: ListId, labels: string[]) {
   }))
 }
 
-const saveLists = (lists: ListState) => generalFetch('/api/meals', {
-  meals: lists.meals.map(item => item.label),
-  unordered: lists.unordered.map(item => item.label),
-})
+function saveLists(lists: ListState) {
+  return generalFetch('/api/meals', {
+    meals: lists.meals.map(item => item.label),
+    unordered: lists.unordered.map(item => item.label),
+  })
+}
 
-function getListEdgeDropIndex(itemCount: number, activeRect: DragOverEvent['active']['rect']['current']['translated'], overRect: DragOverEvent['over'] extends null ? never : NonNullable<DragOverEvent['over']>['rect']) {
+function findContainer(id: UniqueIdentifier, lists: ListState): ListId | null {
+  if (isListId(id)) return id
+  return (listIds.find(listId => lists[listId].some(item => item.id === getId(id))) ?? null)
+}
+
+function findItemIndex(lists: ListState, listId: ListId, itemId: UniqueIdentifier) {
+  return lists[listId].findIndex(item => item.id === getId(itemId))
+}
+
+function findItem(id: UniqueIdentifier | null, lists: ListState) {
+  if (!id) return null
+  const itemId = getId(id)
+  for (const listId of listIds) {
+    const item = lists[listId].find(listItem => listItem.id === itemId)
+    if (item) return item
+  }
+  return null
+}
+
+function moveItem(items: ListItem[], fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) return items
+  const nextItems = items.filter((_, index) => index !== fromIndex)
+  nextItems.splice(toIndex, 0, items[fromIndex])
+  return nextItems
+}
+
+function getListEdgeDropIndex(itemCount: number, activeRect: DragOverEvent['active']['rect']['current']['translated'], overRect: NonNullable<DragOverEvent['over']>['rect']) {
   if (itemCount === 0) return 0
   if (!activeRect) return itemCount
   const activeCenter = activeRect.top + (activeRect.height / 2)
@@ -72,7 +82,7 @@ function getListEdgeDropIndex(itemCount: number, activeRect: DragOverEvent['acti
   return activeCenter <= overMidpoint ? 0 : itemCount
 }
 
-function getItemDropIndex(itemCount: number, overIndex: number, activeRect: DragOverEvent['active']['rect']['current']['translated'], overRect: DragOverEvent['over'] extends null ? never : NonNullable<DragOverEvent['over']>['rect']) {
+function getItemDropIndex(itemCount: number, overIndex: number, activeRect: DragOverEvent['active']['rect']['current']['translated'], overRect: NonNullable<DragOverEvent['over']>['rect']) {
   if (!activeRect) return overIndex
 
   const activeTop = activeRect.top
@@ -112,113 +122,17 @@ function getDropIndicator(event: Pick<DragOverEvent, 'active' | 'over'>, lists: 
   }
 }
 
-function findContainer(id: UniqueIdentifier, lists: ListState): ListId | null {
-  if (isListId(id)) return id
-  return (listIds.find(listId => lists[listId].some(item => item.id === getId(id))) ?? null)
-}
-
-function findItemIndex(lists: ListState, listId: ListId, itemId: UniqueIdentifier) {
-  return lists[listId].findIndex(item => item.id === getId(itemId))
-}
-
-function findItem(id: UniqueIdentifier | null, lists: ListState) {
-  if (!id) return null
-  const itemId = getId(id)
-  for (const listId of listIds) {
-    const item = lists[listId].find(listItem => listItem.id === itemId)
-    if (item) return item
-  }
-  return null
-}
-
-function getItemText(item: ListItem, index?: number) {
-  return typeof index === 'number' ? `${index + 1}. ${item.label}` : item.label
-}
-
-function MealItem({ as: Component = 'li', className = '', item, }: { as?: 'div' | 'li', className?: string, item: ListItem }) {
-  return <Component className={`item ${className}`}>{getItemText(item)}</Component>
-}
-
-function SortableItem({ index, item }: { index: number, item: ListItem }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
-  return <li
-    className={`item ${isDragging ? 'is-dragging' : ''}`}
-    ref={setNodeRef}
-    style={{
-      transform: CSS.Transform.toString(transform),
-      transition,
-    }}
-    {...attributes}
-    {...listeners}
-  >
-    {getItemText(item, index)}
-  </li>
-}
-
-function GhostItem({ index, item }: { index: number, item: ListItem }) {
-  return <li aria-hidden="true" className="item item-ghost">{getItemText(item, index)}</li>
-}
-
-function ListColumn({ activeId, activeItem, details, dropIndicator, items, listId }: {
-  activeId: UniqueIdentifier | null
-  activeItem: ListItem | null
-  details: ListDetail
-  dropIndicator: DropIndicator | null
-  items: ListItem[]
-  listId: ListId
-}) {
-  const { setNodeRef } = useDroppable({ id: listId })
-  const visibleItems = activeId ? items.filter(item => item.id !== getId(activeId)) : items
-  const ghostIndex = dropIndicator?.listId === listId && activeItem
-    ? Math.max(0, Math.min(dropIndicator.index, visibleItems.length))
-    : null
-
-  return <section className="list" data-list-id={listId}>
-    <h2>{details.title}</h2>
-    <SortableContext
-      items={visibleItems.map(item => item.id)}
-      strategy={verticalListSortingStrategy}
-    >
-      <ul className="items" ref={setNodeRef}>
-        {visibleItems.map((item, index) => <Fragment key={item.id}>
-          {ghostIndex === index && activeItem && <GhostItem index={index} item={activeItem} />}
-          <SortableItem
-            index={ghostIndex !== null && ghostIndex <= index ? index + 1 : index}
-            item={item}
-          />
-        </Fragment>)}
-        {ghostIndex === visibleItems.length && activeItem && <GhostItem index={visibleItems.length} item={activeItem} />}
-      </ul>
-    </SortableContext>
-    {visibleItems.length === 0 && ghostIndex === null && <p className="empty-message">{details.empty}</p>}
-  </section>
-}
-
-function OrderHistory({ items }: { items: HistoryMap }) {
-  const entries = Object.entries(items)
-  if (entries.length === 0) return <p className="empty-message history-empty">No order history yet.</p>
-  return <ul className="popup-list history-list">
-    {entries.map(([date, meal]) => <li className="history-item" key={date}>
-      <span className="history-date">{date.split("-").splice(1).join("-")}</span>
-      <span className="history-meal">{meal}</span>
-    </li>)}
-  </ul>
-}
-
 export default function App() {
   const [lists, setLists] = useState<ListState>(initialLists)
   const [historyItems, setHistoryItems] = useState<HistoryMap>({})
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
   const [isUnorderedVisible, setIsUnorderedVisible] = useState(true)
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCredentialsOpen, setIsCredentialsOpen] = useState(false)
-  const [isGathering, setIsGathering] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [credentialsWareSet, setCredentialsWareSet] = useState(localStorage.getItem("credentialsWareSet") === "1")
-  const toolbarRef = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const activeItem = useMemo(() => findItem(activeId, lists), [activeId, lists])
-  const historyNotificationCount = useMemo(() => Object.keys(historyItems).length, [historyItems])
   const visibleListEntries = useMemo(
     () => listEntries.filter(([listId]) => isUnorderedVisible || listId !== 'unordered'),
     [isUnorderedVisible]
@@ -228,7 +142,7 @@ export default function App() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  async function loadMealLists(shouldApply = () => true) {
+  async function loadMealLists(shouldApply: () => boolean = () => true) {
     const [mealsData, unorderedMeals] = await Promise.all([
       getFetchData<string[]>('/api/meals'),
       getFetchData<string[]>('/api/unordered'),
@@ -267,28 +181,7 @@ export default function App() {
     }
 
     void loadBoardData()
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!toolbarRef.current?.contains(event.target as Node)) {
-        setIsHistoryOpen(false)
-        setIsMenuOpen(false)
-      }
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsHistoryOpen(false)
-        setIsMenuOpen(false)
-        setIsCredentialsOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      isMounted = false
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
+    return () => { isMounted = false }
   }, [])
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -301,9 +194,7 @@ export default function App() {
     setDropIndicator(activeListId && activeIndex !== -1 ? { listId: activeListId, index: activeIndex } : null)
   }
 
-  const handleDragOver = (event: DragOverEvent) => {
-    setDropIndicator(getDropIndicator(event, lists))
-  }
+  const handleDragOver = (event: DragOverEvent) => { setDropIndicator(getDropIndicator(event, lists)) }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active } = event
@@ -342,79 +233,33 @@ export default function App() {
     })
   }
 
-  async function handleGather() {
-    if (isGathering) return
-    setIsGathering(true)
-    try { if (await getFetchData('/api/gather') !== null) await loadMealLists() }
-    finally {
-      addAlert("Meals gathered", "G")
-      setIsGathering(false)
-    }
-  }
-  function handleOrder() {
-    getFetchData("/api/order")
-    console.log("ORDER")
+  function handlePositionChange(itemId: UniqueIdentifier, nextPosition: number) {
+    if (!Number.isInteger(nextPosition)) return
+    setLists(currentLists => {
+      const activeIndex = findItemIndex(currentLists, 'meals', itemId)
+      if (activeIndex === -1) return currentLists
+      const nextIndex = Math.max(0, Math.min(nextPosition - 1, currentLists.meals.length - 1))
+      if (activeIndex === nextIndex) return currentLists
+      const nextLists = {
+        ...currentLists,
+        meals: moveItem(currentLists.meals, activeIndex, nextIndex)
+      }
+      void saveLists(nextLists)
+      return nextLists
+    })
   }
 
   return <main className="app">
-    <div className="app-toolbar" ref={toolbarRef}>
-      <div className="toolbar-group">
-        <button
-          aria-expanded={isHistoryOpen}
-          aria-haspopup="dialog"
-          className="menu-button history-button"
-          onClick={() => {
-            setIsHistoryOpen(open => !open)
-            setIsMenuOpen(false)
-          }}
-          type="button"
-        >
-          Order history
-          {historyNotificationCount > 0 && <span className="history-badge">{historyNotificationCount}</span>}
-        </button>
-        {isHistoryOpen && <div className="menu-popup menu-popup-left" role="dialog" aria-label="Order history">
-          <OrderHistory items={historyItems} />
-        </div>}
-      </div>
-      <div className="toolbar-group toolbar-group-right">
-        <button
-          className="menu-button"
-          onClick={() => setIsUnorderedVisible(visible => !visible)}
-          type="button"
-        >
-          {isUnorderedVisible ? 'Hide Unordered' : 'Show Unordered'}
-        </button>
-        <button
-          className="menu-button"
-          onClick={() => {
-            setIsCredentialsOpen(true)
-            setIsMenuOpen(false)
-            setIsHistoryOpen(false)
-          }}
-          type="button"
-        >
-          Credentials
-        </button>
-        <button
-          aria-expanded={isMenuOpen}
-          aria-haspopup="dialog"
-          className="menu-button"
-          onClick={() => {
-            setIsMenuOpen(open => !open)
-            setIsHistoryOpen(false)
-          }}
-          type="button"
-        >
-          User actions
-        </button>
-        {isMenuOpen && <div className="menu-popup menu-popup-right" role="dialog" aria-label="Actions menu">
-          <button disabled={isGathering} type="button" onClick={handleGather}>
-            {isGathering ? 'Gathering' : 'Gather'}
-          </button>
-          <button type="button" onClick={handleOrder}>Order</button>
-        </div>}
-      </div>
-    </div>
+    <Toolbar
+      historyItems={historyItems}
+      loadMealLists={loadMealLists}
+      isUnorderedVisible={isUnorderedVisible}
+      onCredentialsClick={() => setIsCredentialsOpen(true)}
+      onSearchChange={setSearchQuery}
+      onUnorderedToggle={() => setIsUnorderedVisible(visible => !visible)}
+      searchInputRef={searchInputRef}
+      searchQuery={searchQuery}
+    />
     <DndContext
       collisionDetection={closestCorners}
       onDragCancel={() => {
@@ -436,11 +281,13 @@ export default function App() {
             items={lists[listId]}
             key={listId}
             listId={listId}
+            onPositionChange={handlePositionChange}
+            searchQuery={searchQuery}
           />
         ))}
       </section>
       <DragOverlay>
-        {activeItem && <MealItem as="div" item={activeItem} className="drag-overlay-item" />}
+        {activeItem && <div className="item drag-overlay-item">{activeItem.label}</div>}
       </DragOverlay>
     </DndContext>
     {isCredentialsOpen && <Credentials
