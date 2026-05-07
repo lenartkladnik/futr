@@ -14,12 +14,16 @@ args = parser.parse_args()
 
 PORT = args.port
 if args.docker:
-    DATA_FP = "/data/meals.json"
-    CREDS_FP = "/data/creds.json"
+    DATA_BASE = "/data/"
 else:
-    DATA_FP = "data/meals.json"
-    CREDS_FP = "data/creds.json"
+    DATA_BASE = "data/"
+DATA_FP = DATA_BASE + "meals.json"
+CREDS_FP = DATA_BASE + "creds.json"
 SERVE_PREFIX = "/serve"
+
+if not os.path.exists(DATA_BASE):
+    os.mkdir(DATA_BASE)
+
 creds_exist = False
 try:
     creds = json.load(open(CREDS_FP))
@@ -39,9 +43,9 @@ EMPTY_MEALS_FILE = {"meals": [], "unordered": []}
 def ensure_meals_file():
     if os.path.exists(DATA_FP) and os.path.getsize(DATA_FP) >= len(json.dumps(EMPTY_MEALS_FILE)) :
         return
-    
+
     print("Making empty meals.json")
-    
+
     data_dir = os.path.dirname(DATA_FP)
     if data_dir:
         os.makedirs(data_dir, exist_ok=True)
@@ -226,7 +230,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                             f.write(json.dumps(data))
 
                     return self.serve_json(200, b"{\"ok\": true}")
-                except:
+                except Exception as e:
+                    print(f"[do_POST] Failed to serve {self.path}: {e}")
                     return self.serve_json(500, b"{\"ok\": false}")
 
             elif not creds_exist:
@@ -240,7 +245,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         write_meals(data)
 
                     return self.serve_json(200, b"{\"ok\": true}")
-                except:
+                except Exception as e:
+                    print(f"[do_POST] Failed to serve {self.path}: {e}")
                     return self.serve_json(500, b"{\"ok\": false}")
 
         except Exception as e:
