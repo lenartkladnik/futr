@@ -113,9 +113,9 @@ def gather_meals(n: int) -> list:
         except:
             pass
 
-    gathered.remove("NI")
-    gathered.remove("medicinsko predpisane diete po dogovoru")
     try:
+        gathered.remove("NI")
+        gathered.remove("medicinsko predpisane diete po dogovoru")
         gathered.remove("")
     except:
         pass
