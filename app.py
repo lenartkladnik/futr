@@ -76,7 +76,7 @@ def set_meals():
         id, desc = get_meal_id(opts)
 
         if id == MEAL_NOT_FOUND:
-            print(f"Failed to set meal: {id}, for date: {date.strftime("%d/%m/%Y")}")
+            print(f"Failed to set meal: {id}, for date: {date.strftime('%d/%m/%Y')}")
             continue
 
         if id == UNSET_MEAL:
@@ -85,7 +85,7 @@ def set_meals():
             r = session.api.set_meals_menu(date, id)
 
         if not r["ok"]:
-            print(f"Failed to set meal: {id}, for date: {date.strftime("%d/%m/%Y")}")
+            print(f"Failed to set meal: {id}, for date: {date.strftime('%d/%m/%Y')}")
             print(f"-> {r}")
             continue
 
