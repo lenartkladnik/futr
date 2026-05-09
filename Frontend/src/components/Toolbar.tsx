@@ -8,7 +8,7 @@ import { getFetchData } from './fetch'
 export default function Toolbar({ historyItems, isUnorderedVisible, onCredentialsClick, onSearchChange, onUnorderedToggle, loadMealLists, searchInputRef, searchQuery }: {
   historyItems: HistoryMap
   isUnorderedVisible: boolean
-  loadMealLists: () => void
+  loadMealLists: () => Promise<void>
   onCredentialsClick: () => void
   onSearchChange: (value: string) => void
   onUnorderedToggle: () => void
